@@ -28,10 +28,24 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Kafka: 다른 서비스에서 발행한 이벤트를 구독(consume)하기 위한 라이브러리
+    // Spring Boot가 버전을 자동으로 관리하므로 버전 명시 불필요
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // Redis: 읽지 않은 알림 카운트 캐싱 + Pub/Sub 기반 멀티 인스턴스 SSE 브로드캐스트
+    // Lettuce 클라이언트가 기본으로 포함되어 있음 (별도 클라이언트 설정 불필요)
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // Jackson: Kafka로 전달받은 JSON 문자열을 Java 객체로 변환(역직렬화)할 때 사용
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310' // LocalDateTime 직렬화 지원
+
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
     annotationProcessor 'org.projectlombok:lombok'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.kafka:spring-kafka-test' // Kafka 테스트용 EmbeddedKafka 지원
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
