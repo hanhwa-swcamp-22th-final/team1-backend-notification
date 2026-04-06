@@ -1,0 +1,37 @@
+# Gradle 빌드 캐시 및 결과물 (이미지 안에 불필요)
+.gradle/
+build/
+
+# Gradle Wrapper JAR는 제외 금지 (빌드에 필요)
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE 설정 파일
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS 메타데이터
+.DS_Store
+Thumbs.db
+
+# Git 파일
+.git/
+.gitignore
+.gitattributes
+
+# 로컬 환경 설정 파일
+*.env
+*.local
+
+# Dockerfile 자체
+Dockerfile
+.dockerignore
+
+# 로그 파일
+*.log
+logs/
+
+# 테스트 결과물
+test-results/
