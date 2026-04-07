@@ -1,5 +1,7 @@
 package com.conk.notification.command.infrastructure.redis.service;
 
+import com.conk.notification.common.exception.BusinessException;
+import com.conk.notification.common.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -50,15 +52,17 @@ public class NotificationUnreadCountService {
         String key = KEY_PREFIX + accountId; // "notification:unread:1001"
 
         try {
-            // increment(): Redis INCR 명령 → 현재 값 + 1 후 반환
             Long count = stringRedisTemplate.opsForValue().increment(key);
             long result = count != null ? count : 0L;
             log.debug("[읽지 않은 알림 증가] accountId={}, count={}", accountId, result);
             return result;
 
         } catch (Exception e) {
-            log.error("[Redis 카운트 증가 실패] accountId={}, 오류={}", accountId, e.getMessage());
-            return 0L; // Redis 장애 시 0 반환 (알림 저장 자체는 이미 완료)
+            // AFTER_COMMIT 후속 처리에서 사용할 예외이므로 상위 리스너가 로깅 정책을 결정하도록 넘긴다.
+            throw new BusinessException(
+                    ErrorCode.REDIS_DISPATCH_FAILED,
+                    "Redis unread 증가 실패 accountId=%s".formatted(accountId)
+            );
         }
     }
 
