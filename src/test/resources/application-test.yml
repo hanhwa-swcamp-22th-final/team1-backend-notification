@@ -1,0 +1,47 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:notification_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+    show-sql: false
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: notification-test-group
+    listener:
+      auto-startup: false
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  autoconfigure:
+    exclude:
+      # @SpringBootTest에서 RedisConnectionFactory를 @MockBean으로 교체하면
+      # 실제 Lettuce LettuceConnectionFactory(ReactiveRedisConnectionFactory도 구현)가 없어진다.
+      # 아래 Auto Configuration들은 ReactiveRedisConnectionFactory가 있어야 동작하므로 테스트에서 비활성화한다.
+      - org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration
+      - org.springframework.boot.actuate.autoconfigure.data.redis.RedisReactiveHealthContributorAutoConfiguration
+
+notification:
+  sse:
+    timeout: 1800000
+  redis:
+    pubsub:
+      enabled: false
+
+member:
+  service:
+    url: http://localhost:8081
