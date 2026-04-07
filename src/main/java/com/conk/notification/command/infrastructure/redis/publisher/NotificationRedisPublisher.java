@@ -1,6 +1,8 @@
 package com.conk.notification.command.infrastructure.redis.publisher;
 
 import com.conk.notification.command.application.dto.SseNotificationPayload;
+import com.conk.notification.common.exception.BusinessException;
+import com.conk.notification.common.exception.ErrorCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -11,7 +13,7 @@ import org.springframework.stereotype.Component;
 /**
  * Redis Pub/Sub 발행자 (Publisher)
  *
- * 알림이 DB에 저장된 직후, 해당 알림을 Redis 채널에 발행한다.
+ * 알림이 DB에 정상 커밋된 직후, 해당 알림을 Redis 채널에 발행한다.
  * 이 메시지를 구독(Subscribe)하고 있는 모든 notification-service 인스턴스가
  * 메시지를 수신하여 해당 사용자의 SSE 연결로 push한다.
  *
@@ -63,18 +65,22 @@ public class NotificationRedisPublisher {
         String channel = CHANNEL_PREFIX + accountId; // "notification:user:1001"
 
         try {
-            // Java 객체 → JSON 문자열 변환
             String message = objectMapper.writeValueAsString(payload);
-
-            // Redis에 PUBLISH 명령 실행
-            // convertAndSend(채널명, 메시지): Kafka의 KafkaTemplate.send()와 유사한 개념
             stringRedisTemplate.convertAndSend(channel, message);
 
             log.info("[Redis Publish] channel={}, payload={}", channel, message);
 
         } catch (JsonProcessingException e) {
-            // JSON 직렬화 실패 시 SSE push를 건너뜀 (DB 저장은 이미 완료된 상태)
-            log.error("[Redis Publish 실패] accountId={}, 오류={}", accountId, e.getMessage());
+            // payload 직렬화 실패는 개발/계약 문제에 가깝기 때문에 BusinessException으로 전환한다.
+            throw new BusinessException(
+                    ErrorCode.REDIS_DISPATCH_FAILED,
+                    "Redis publish 직렬화 실패 accountId=%s".formatted(accountId)
+            );
+        } catch (Exception e) {
+            throw new BusinessException(
+                    ErrorCode.REDIS_DISPATCH_FAILED,
+                    "Redis publish 실패 accountId=%s".formatted(accountId)
+            );
         }
     }
 }
