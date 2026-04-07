@@ -78,8 +78,8 @@ public class NotificationKafkaConsumer {
     /**
      * wms-service가 발행하는 "wms.asn.created" 토픽 메시지를 수신한다.
      *
-     * 수신자: wms-service가 ASN 등록 시 선택한 창고의 WH_MANAGER accountId 목록을
-     *         이벤트에 직접 포함한다. (외부 서비스 조회 없음)
+     * 수신자: 창고 1개당 WH_MANAGER 1명이므로 wms-service가 managerId를 단일 값으로 포함한다.
+     *         외부 서비스 조회 없이 이벤트의 managerId를 그대로 사용한다.
      *
      * @param payload Kafka에서 수신한 JSON 문자열
      */
@@ -94,22 +94,13 @@ public class NotificationKafkaConsumer {
         String message = String.format("입고예정 %d건이 등록되었습니다. (예정일: %s)",
                 event.getAsnCount(), event.getExpectedDate());
 
-        if (event.getRecipientIds().isEmpty()) {
-            log.warn("[알림 발송 없음] ASN_CREATED 이벤트에 수신자가 없습니다. asnId={}", event.getAsnId());
-            return;
-        }
-
-        for (String accountId : event.getRecipientIds()) {
-            notificationCommandService.createNotification(new CreateNotificationCommand(
-                    accountId,
-                    "ROLE_WH_MANAGER",
-                    NotificationType.ASN_CREATED,
-                    "입고예정 등록",
-                    message
-            ));
-        }
-
-        log.info("[알림 발송 완료] ASN_CREATED → {}명에게 발송", event.getRecipientIds().size());
+        notificationCommandService.createNotification(new CreateNotificationCommand(
+                event.getManagerId(),
+                "ROLE_WH_MANAGER",
+                NotificationType.ASN_CREATED,
+                "입고예정 등록",
+                message
+        ));
     }
 
     /**
