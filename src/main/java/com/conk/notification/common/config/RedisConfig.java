@@ -3,6 +3,7 @@ package com.conk.notification.common.config;
 import com.conk.notification.command.infrastructure.redis.subscriber.RedisNotificationSubscriber;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -75,6 +76,7 @@ public class RedisConfig {
      *   Adapter 패턴으로 기존 클래스를 변경 없이 인터페이스에 맞게 감싼다.
      */
     @Bean
+    @ConditionalOnProperty(name = "notification.redis.pubsub.enabled", havingValue = "true", matchIfMissing = true)
     public MessageListenerAdapter messageListenerAdapter(RedisNotificationSubscriber subscriber) {
         return new MessageListenerAdapter(subscriber, "onMessage");
     }
@@ -93,8 +95,12 @@ public class RedisConfig {
      * addMessageListener(listener, topic):
      *   - listener: 메시지를 처리할 MessageListener (위에서 등록한 Adapter)
      *   - topic: 구독할 채널 패턴
+     *
+     * 테스트에서는 notification.redis.pubsub.enabled=false로 비활성화해
+     * 실제 Redis 서버 없이도 컨텍스트를 부팅할 수 있게 한다.
      */
     @Bean
+    @ConditionalOnProperty(name = "notification.redis.pubsub.enabled", havingValue = "true", matchIfMissing = true)
     public RedisMessageListenerContainer redisMessageListenerContainer(
             RedisConnectionFactory connectionFactory,
             MessageListenerAdapter messageListenerAdapter
