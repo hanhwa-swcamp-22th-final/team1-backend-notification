@@ -19,7 +19,7 @@ public class CreateNotificationCommand {
     /** 알림을 받을 계정의 역할 ID (member-service Role.roleId) */
     private final String roleId;
 
-    /** 알림 유형 (TASK_ASSIGNED / ASN_CREATED / ORDER_REGISTERED) */
+    /** 알림 유형 (TASK_ASSIGNED / ASN_CREATED) */
     private final NotificationType notificationType;
 
     /** 알림 제목 (짧은 요약) */

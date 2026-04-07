@@ -20,16 +20,8 @@ public enum NotificationType {
     /**
      * 입고예정 등록 알림
      * 발행 서비스: wms-service
-     * 수신 대상: WH_MANAGER (해당 테넌트의 창고 관리자 전원)
+     * 수신 대상: WH_MANAGER (ASN 등록 시 선택한 창고의 관리자)
      * 예시 메시지: "입고예정 2건이 등록되었습니다"
      */
-    ASN_CREATED,
-
-    /**
-     * 주문 등록 알림
-     * 발행 서비스: order-service 또는 integration-service
-     * 수신 대상: MASTER_ADMIN (해당 셀러사의 마스터 어드민)
-     * 예시 메시지: "주문 5건이 등록되었습니다"
-     */
-    ORDER_REGISTERED
+    ASN_CREATED
 }
