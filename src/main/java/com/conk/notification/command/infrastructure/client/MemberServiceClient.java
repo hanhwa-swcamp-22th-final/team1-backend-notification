@@ -1,5 +1,7 @@
 package com.conk.notification.command.infrastructure.client;
 
+import com.conk.notification.common.exception.ErrorCode;
+import com.conk.notification.common.exception.RetryableKafkaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,7 +11,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
@@ -36,9 +40,11 @@ public class MemberServiceClient {
     @Value("${member.service.url}")
     private String memberServiceUrl;
 
-    // RestTemplate: HTTP 요청을 보내는 Spring 기본 클라이언트
-    // @Bean으로 등록하거나 new로 생성 가능. 여기서는 간단하게 필드로 생성.
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public MemberServiceClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     /**
      * 특정 테넌트의 특정 역할 계정 목록을 조회한다.
@@ -47,54 +53,21 @@ public class MemberServiceClient {
      *
      * @param tenantId 테넌트 ID
      * @param roleId   역할 ID (예: "ROLE_WH_MANAGER")
-     * @return 해당 조건에 맞는 계정 정보 목록. member-service 호출 실패 시 빈 리스트 반환.
+     * @return 해당 조건에 맞는 계정 정보 목록. 정상 응답이지만 결과가 없으면 빈 리스트를 반환한다.
      */
     public List<MemberAccountInfo> getAccountsByTenantAndRole(String tenantId, String roleId) {
-        // URL 조합: http://localhost:8081/member/accounts/by-tenant?tenantId=xxx&roleId=yyy
-        String url = memberServiceUrl + "/member/accounts/by-tenant?tenantId=" + tenantId + "&roleId=" + roleId;
+        URI uri = UriComponentsBuilder.fromHttpUrl(memberServiceUrl)
+                .path("/member/accounts/by-tenant")
+                .queryParam("tenantId", tenantId)
+                .queryParam("roleId", roleId)
+                .build(true)
+                .toUri();
 
         log.info("[MemberServiceClient] 테넌트 계정 조회 요청: tenantId={}, roleId={}", tenantId, roleId);
 
         try {
-            // exchange(): HTTP 요청을 보내고 응답을 지정한 타입으로 받는다.
-            // ParameterizedTypeReference: List<MemberAccountInfo> 같은 제네릭 타입을 런타임에 유지하기 위해 사용
             ResponseEntity<List<MemberAccountInfo>> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    null, // 요청 body 없음 (GET 요청)
-                    new ParameterizedTypeReference<List<MemberAccountInfo>>() {}
-            );
-
-            List<MemberAccountInfo> accounts = response.getBody();
-            log.info("[MemberServiceClient] 조회 결과: {}명", accounts != null ? accounts.size() : 0);
-            return accounts != null ? accounts : Collections.emptyList();
-
-        } catch (RestClientException e) {
-            // member-service가 내려가 있거나 응답이 없는 경우 예외 발생
-            // 알림 누락을 최소화하기 위해 예외를 던지지 않고 빈 리스트를 반환한다.
-            // (향후 재시도 로직이나 DLQ(Dead Letter Queue)로 처리 가능)
-            log.error("[MemberServiceClient] 테넌트 계정 조회 실패: tenantId={}, 오류={}", tenantId, e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
-    /**
-     * 특정 셀러의 특정 역할 계정 목록을 조회한다.
-     *
-     * 사용 사례: ORDER_REGISTERED 이벤트 → sellerId의 MASTER_ADMIN에게 알림
-     *
-     * @param sellerId 셀러 ID
-     * @param roleId   역할 ID (예: "ROLE_MASTER_ADMIN")
-     * @return 해당 조건에 맞는 계정 정보 목록. member-service 호출 실패 시 빈 리스트 반환.
-     */
-    public List<MemberAccountInfo> getAccountsBySellerAndRole(String sellerId, String roleId) {
-        String url = memberServiceUrl + "/member/accounts/by-seller?sellerId=" + sellerId + "&roleId=" + roleId;
-
-        log.info("[MemberServiceClient] 셀러 계정 조회 요청: sellerId={}, roleId={}", sellerId, roleId);
-
-        try {
-            ResponseEntity<List<MemberAccountInfo>> response = restTemplate.exchange(
-                    url,
+                    uri,
                     HttpMethod.GET,
                     null,
                     new ParameterizedTypeReference<List<MemberAccountInfo>>() {}
@@ -105,8 +78,51 @@ public class MemberServiceClient {
             return accounts != null ? accounts : Collections.emptyList();
 
         } catch (RestClientException e) {
-            log.error("[MemberServiceClient] 셀러 계정 조회 실패: sellerId={}, 오류={}", sellerId, e.getMessage());
-            return Collections.emptyList();
+            // 외부 연동 장애는 "수신자 없음"과 구분해야 하므로 retryable 예외로 전환한다.
+            throw new RetryableKafkaException(
+                    ErrorCode.RECIPIENT_LOOKUP_FAILED,
+                    "member-service 수신자 조회 실패 tenantId=%s, roleId=%s".formatted(tenantId, roleId)
+            );
+        }
+    }
+
+    /**
+     * 특정 셀러의 특정 역할 계정 목록을 조회한다.
+     *
+     * 사용 사례: ORDER_REGISTERED 이벤트 → sellerId의 MASTER_ADMIN에게 알림
+     *
+     * @param sellerId 셀러 ID
+     * @param roleId   역할 ID (예: "ROLE_MASTER_ADMIN")
+     * @return 해당 조건에 맞는 계정 정보 목록. 정상 응답이지만 결과가 없으면 빈 리스트를 반환한다.
+     */
+    public List<MemberAccountInfo> getAccountsBySellerAndRole(String sellerId, String roleId) {
+        URI uri = UriComponentsBuilder.fromHttpUrl(memberServiceUrl)
+                .path("/member/accounts/by-seller")
+                .queryParam("sellerId", sellerId)
+                .queryParam("roleId", roleId)
+                .build(true)
+                .toUri();
+
+        log.info("[MemberServiceClient] 셀러 계정 조회 요청: sellerId={}, roleId={}", sellerId, roleId);
+
+        try {
+            ResponseEntity<List<MemberAccountInfo>> response = restTemplate.exchange(
+                    uri,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<MemberAccountInfo>>() {}
+            );
+
+            List<MemberAccountInfo> accounts = response.getBody();
+            log.info("[MemberServiceClient] 조회 결과: {}명", accounts != null ? accounts.size() : 0);
+            return accounts != null ? accounts : Collections.emptyList();
+
+        } catch (RestClientException e) {
+            // 외부 연동 장애는 "수신자 없음"과 구분해야 하므로 retryable 예외로 전환한다.
+            throw new RetryableKafkaException(
+                    ErrorCode.RECIPIENT_LOOKUP_FAILED,
+                    "member-service 수신자 조회 실패 sellerId=%s, roleId=%s".formatted(sellerId, roleId)
+            );
         }
     }
 
