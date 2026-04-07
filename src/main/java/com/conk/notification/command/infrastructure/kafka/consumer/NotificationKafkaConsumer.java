@@ -3,8 +3,6 @@ package com.conk.notification.command.infrastructure.kafka.consumer;
 import com.conk.notification.command.application.dto.CreateNotificationCommand;
 import com.conk.notification.command.application.service.NotificationCommandService;
 import com.conk.notification.command.domain.enums.NotificationType;
-import com.conk.notification.command.infrastructure.client.MemberServiceClient;
-import com.conk.notification.command.infrastructure.client.MemberServiceClient.MemberAccountInfo;
 import com.conk.notification.command.infrastructure.kafka.event.AsnCreatedEvent;
 import com.conk.notification.command.infrastructure.kafka.event.TaskAssignedEvent;
 import com.conk.notification.common.exception.ErrorCode;
@@ -16,15 +14,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-
 /**
  * Kafka 이벤트 Consumer
  *
  * wms-service에서 발행한 Kafka 메시지를 수신하여 알림을 생성하고 DB에 저장하는 역할을 한다.
  *
+ * 수신자 결정은 발행 서비스(wms-service)가 담당하며,
+ * 이 Consumer는 이벤트에 포함된 수신자 정보를 그대로 사용한다.
+ *
  * 처리 흐름:
- *   Kafka 브로커 → 토픽 메시지 수신 → JSON 역직렬화 → 수신자 조회(필요 시) → 알림 저장
+ *   Kafka 브로커 → 토픽 메시지 수신 → JSON 역직렬화 → 알림 저장
  */
 @Component
 public class NotificationKafkaConsumer {
@@ -32,16 +31,13 @@ public class NotificationKafkaConsumer {
     private static final Logger log = LoggerFactory.getLogger(NotificationKafkaConsumer.class);
 
     private final NotificationCommandService notificationCommandService;
-    private final MemberServiceClient memberServiceClient;
     private final ObjectMapper objectMapper;
 
     public NotificationKafkaConsumer(
             NotificationCommandService notificationCommandService,
-            MemberServiceClient memberServiceClient,
             ObjectMapper objectMapper
     ) {
         this.notificationCommandService = notificationCommandService;
-        this.memberServiceClient = memberServiceClient;
         this.objectMapper = objectMapper;
     }
 
@@ -52,7 +48,7 @@ public class NotificationKafkaConsumer {
     /**
      * wms-service가 발행하는 "wms.task.assigned" 토픽 메시지를 수신한다.
      *
-     * 수신자: wms-service가 이벤트에 workerId를 직접 포함하므로 member-service 호출 불필요.
+     * 수신자: wms-service가 이벤트에 workerId를 직접 포함한다.
      *
      * @param payload Kafka에서 수신한 JSON 문자열
      */
@@ -82,8 +78,8 @@ public class NotificationKafkaConsumer {
     /**
      * wms-service가 발행하는 "wms.asn.created" 토픽 메시지를 수신한다.
      *
-     * 수신자: ASN 등록 시 선택한 창고(warehouseId)의 WH_MANAGER를
-     *         member-service에서 조회하여 알림을 발송한다.
+     * 수신자: wms-service가 ASN 등록 시 선택한 창고의 WH_MANAGER accountId 목록을
+     *         이벤트에 직접 포함한다. (외부 서비스 조회 없음)
      *
      * @param payload Kafka에서 수신한 JSON 문자열
      */
@@ -98,25 +94,22 @@ public class NotificationKafkaConsumer {
         String message = String.format("입고예정 %d건이 등록되었습니다. (예정일: %s)",
                 event.getAsnCount(), event.getExpectedDate());
 
-        List<MemberAccountInfo> managers = memberServiceClient
-                .getManagersByWarehouse(event.getWarehouseId(), "ROLE_WH_MANAGER");
-
-        if (managers.isEmpty()) {
-            log.warn("[알림 발송 없음] warehouseId={}의 WH_MANAGER 계정이 없습니다", event.getWarehouseId());
+        if (event.getRecipientIds().isEmpty()) {
+            log.warn("[알림 발송 없음] ASN_CREATED 이벤트에 수신자가 없습니다. asnId={}", event.getAsnId());
             return;
         }
 
-        for (MemberAccountInfo manager : managers) {
+        for (String accountId : event.getRecipientIds()) {
             notificationCommandService.createNotification(new CreateNotificationCommand(
-                    manager.getAccountId(),
-                    manager.getRoleId(),
+                    accountId,
+                    "ROLE_WH_MANAGER",
                     NotificationType.ASN_CREATED,
                     "입고예정 등록",
                     message
             ));
         }
 
-        log.info("[알림 발송 완료] ASN_CREATED → {}명에게 발송", managers.size());
+        log.info("[알림 발송 완료] ASN_CREATED → {}명에게 발송", event.getRecipientIds().size());
     }
 
     /**
