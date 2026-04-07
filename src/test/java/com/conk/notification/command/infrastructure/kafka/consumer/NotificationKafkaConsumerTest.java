@@ -52,14 +52,14 @@ class NotificationKafkaConsumerTest {
         NotificationKafkaConsumer consumer =
                 new NotificationKafkaConsumer(notificationCommandService, memberServiceClient, objectMapper);
 
-        given(memberServiceClient.getAccountsByTenantAndRole("tenant-001", "ROLE_WH_MANAGER"))
+        given(memberServiceClient.getManagersByWarehouse("WH-001", "ROLE_WH_MANAGER"))
                 .willThrow(new RetryableKafkaException(
                         ErrorCode.RECIPIENT_LOOKUP_FAILED,
                         "lookup failed"
                 ));
 
         assertThatThrownBy(() -> consumer.consumeAsnCreated("""
-                {"asnId":"ASN-1","tenantId":"tenant-001","asnCount":2,"expectedDate":"2026-04-10"}
+                {"asnId":"ASN-1","warehouseId":"WH-001","asnCount":2,"expectedDate":"2026-04-10"}
                 """))
                 .isInstanceOf(RetryableKafkaException.class)
                 .hasMessageContaining("lookup failed");
@@ -92,34 +92,34 @@ class NotificationKafkaConsumerTest {
         NotificationKafkaConsumer consumer =
                 new NotificationKafkaConsumer(notificationCommandService, memberServiceClient, objectMapper);
 
-        given(memberServiceClient.getAccountsByTenantAndRole("tenant-001", "ROLE_WH_MANAGER"))
+        given(memberServiceClient.getManagersByWarehouse("WH-001", "ROLE_WH_MANAGER"))
                 .willReturn(List.of());
 
         consumer.consumeAsnCreated("""
-                {"asnId":"ASN-1","tenantId":"tenant-001","asnCount":2,"expectedDate":"2026-04-10"}
+                {"asnId":"ASN-1","warehouseId":"WH-001","asnCount":2,"expectedDate":"2026-04-10"}
                 """);
 
         then(notificationCommandService).shouldHaveNoInteractions();
     }
 
     @Test
-    @DisplayName("ORDER_REGISTERED는 조회된 관리자 수만큼 알림을 생성한다")
-    void consumeOrderRegistered_createsNotificationsForResolvedRecipients() {
+    @DisplayName("ASN_CREATED는 조회된 관리자 수만큼 알림을 생성한다")
+    void consumeAsnCreated_createsNotificationsForAllManagers() {
         NotificationKafkaConsumer consumer =
                 new NotificationKafkaConsumer(notificationCommandService, memberServiceClient, objectMapper);
 
         MemberAccountInfo first = new MemberAccountInfo();
-        first.setAccountId("3001");
-        first.setRoleId("ROLE_MASTER_ADMIN");
+        first.setAccountId("2001");
+        first.setRoleId("ROLE_WH_MANAGER");
         MemberAccountInfo second = new MemberAccountInfo();
-        second.setAccountId("3002");
-        second.setRoleId("ROLE_MASTER_ADMIN");
+        second.setAccountId("2002");
+        second.setRoleId("ROLE_WH_MANAGER");
 
-        given(memberServiceClient.getAccountsBySellerAndRole("seller-001", "ROLE_MASTER_ADMIN"))
+        given(memberServiceClient.getManagersByWarehouse("WH-001", "ROLE_WH_MANAGER"))
                 .willReturn(List.of(first, second));
 
-        consumer.consumeOrderRegistered("""
-                {"sellerId":"seller-001","tenantId":"tenant-001","orderCount":5}
+        consumer.consumeAsnCreated("""
+                {"asnId":"ASN-1","warehouseId":"WH-001","asnCount":2,"expectedDate":"2026-04-10"}
                 """);
 
         then(notificationCommandService).should(org.mockito.Mockito.times(2))
