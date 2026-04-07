@@ -14,9 +14,8 @@ public enum ErrorCode {
     // 400 Bad Request — 요청 유효성
     MISSING_ACCOUNT_ID(HttpStatus.BAD_REQUEST, "NTF-001", "accountId가 필요합니다."),
 
-    // 400 / 502 / 500 — Kafka / 외부 연동 오류
+    // 400 / 500 — Kafka / 내부 처리 오류
     INVALID_KAFKA_MESSAGE(HttpStatus.BAD_REQUEST, "NTF-301", "Kafka 메시지 형식이 올바르지 않습니다."),
-    RECIPIENT_LOOKUP_FAILED(HttpStatus.BAD_GATEWAY, "NTF-302", "알림 수신자 조회에 실패했습니다."),
     NOTIFICATION_SAVE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "NTF-303", "알림 저장에 실패했습니다."),
     REDIS_DISPATCH_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "NTF-304", "실시간 알림 후속 처리에 실패했습니다."),
 
