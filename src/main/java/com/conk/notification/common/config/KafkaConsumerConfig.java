@@ -1,7 +1,10 @@
 package com.conk.notification.common.config;
 
+import com.conk.notification.common.exception.NonRetryableKafkaException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +13,8 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +35,8 @@ import java.util.Map;
 @Configuration
 public class KafkaConsumerConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(KafkaConsumerConfig.class);
+
     // application.properties에서 주입받는 Kafka 브로커 주소
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -37,6 +44,9 @@ public class KafkaConsumerConfig {
     // application.properties에서 주입받는 Consumer 그룹 ID
     @Value("${spring.kafka.consumer.group-id}")
     private String groupId;
+
+    @Value("${spring.kafka.listener.concurrency:3}")
+    private int concurrency;
 
     /**
      * Kafka Consumer 설정을 담은 Map을 반환한다.
@@ -97,14 +107,46 @@ public class KafkaConsumerConfig {
                 new ConcurrentKafkaListenerContainerFactory<>();
 
         factory.setConsumerFactory(consumerFactory());
+        factory.setCommonErrorHandler(kafkaErrorHandler());
 
         // 동시에 처리할 스레드 수 (파티션 수와 맞추는 것이 좋음)
-        factory.setConcurrency(3);
+        factory.setConcurrency(concurrency);
 
         // 메시지 1건 처리 완료 시마다 offset 커밋
         // (서비스 재시작 시 이미 처리한 메시지는 다시 소비하지 않음)
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.RECORD);
 
         return factory;
+    }
+
+    /**
+     * Kafka 공통 에러 핸들러.
+     *
+     * 재시도 정책:
+     * - 기본: 1초 -> 2초 -> 4초 backoff로 최대 3회 재시도
+     * - NonRetryableKafkaException: 즉시 재시도 중단
+     *
+     * member-service 장애나 일시적 DB 오류는 재시도 대상으로 두고,
+     * 잘못된 payload는 즉시 포기하도록 분리한다.
+     */
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler() {
+        ExponentialBackOffWithMaxRetries backOff = new ExponentialBackOffWithMaxRetries(3);
+        backOff.setInitialInterval(1000L);
+        backOff.setMultiplier(2.0);
+        backOff.setMaxInterval(4000L);
+
+        DefaultErrorHandler handler = new DefaultErrorHandler(
+                (record, ex) -> log.error(
+                        "[Kafka 처리 최종 실패] topic={}, partition={}, offset={}",
+                        record.topic(),
+                        record.partition(),
+                        record.offset(),
+                        ex
+                ),
+                backOff
+        );
+        handler.addNotRetryableExceptions(NonRetryableKafkaException.class);
+        return handler;
     }
 }
