@@ -1,6 +1,8 @@
 package com.conk.notification.query.controller;
 
 import com.conk.notification.command.infrastructure.redis.service.NotificationUnreadCountService;
+import com.conk.notification.common.exception.BusinessException;
+import com.conk.notification.common.exception.ErrorCode;
 import com.conk.notification.common.sse.SseEmitterManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +84,10 @@ public class NotificationSseController {
         String resolvedAccountId = (accountId != null) ? accountId : accountIdParam;
 
         if (resolvedAccountId == null || resolvedAccountId.isBlank()) {
-            throw new IllegalArgumentException("accountId가 필요합니다. (헤더 X-User-Id 또는 쿼리 파라미터 accountId)");
+            throw new BusinessException(
+                    ErrorCode.MISSING_ACCOUNT_ID,
+                    "accountId가 필요합니다. (헤더 X-User-Id 또는 쿼리 파라미터 accountId)"
+            );
         }
 
         log.info("[SSE 구독 요청] accountId={}", resolvedAccountId);
@@ -127,7 +132,10 @@ public class NotificationSseController {
         String resolvedAccountId = (accountId != null) ? accountId : accountIdParam;
 
         if (resolvedAccountId == null || resolvedAccountId.isBlank()) {
-            return ResponseEntity.badRequest().build();
+            throw new BusinessException(
+                    ErrorCode.MISSING_ACCOUNT_ID,
+                    "accountId가 필요합니다. (헤더 X-User-Id 또는 쿼리 파라미터 accountId)"
+            );
         }
 
         long count = unreadCountService.getCount(resolvedAccountId);
@@ -150,7 +158,10 @@ public class NotificationSseController {
         String resolvedAccountId = (accountId != null) ? accountId : accountIdParam;
 
         if (resolvedAccountId == null || resolvedAccountId.isBlank()) {
-            return ResponseEntity.badRequest().build();
+            throw new BusinessException(
+                    ErrorCode.MISSING_ACCOUNT_ID,
+                    "accountId가 필요합니다. (헤더 X-User-Id 또는 쿼리 파라미터 accountId)"
+            );
         }
 
         unreadCountService.reset(resolvedAccountId);
