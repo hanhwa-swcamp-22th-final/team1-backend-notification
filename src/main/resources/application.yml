@@ -3,21 +3,26 @@ spring:
     name: team1-backend-notification
 
   datasource:
-    url: jdbc:mariadb://localhost:3307/notification_db?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: temp_password
+    # Docker: SPRING_DATASOURCE_URL 환경변수로 주입 (notification-db:3306)
+    # 로컬 직접 실행: 기본값 localhost:3307 사용
+    url: ${SPRING_DATASOURCE_URL:jdbc:mariadb://localhost:3307/notification_db?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:temp_password}
     driver-class-name: org.mariadb.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: create
-    show-sql: true
+      # create → update: 재시작해도 기존 데이터 유지
+      ddl-auto: update
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
 
   kafka:
-    bootstrap-servers: localhost:9094
+    # Docker: SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    # 로컬 직접 실행: localhost:9094 (Kafka 외부 리스너)
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
     consumer:
       group-id: notification-group
       auto-offset-reset: earliest
@@ -26,12 +31,23 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      # Docker: SPRING_DATA_REDIS_HOST=redis
+      # 로컬 직접 실행: localhost
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
       timeout: 3000ms
 
 server:
-  port: 8085
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
 
 notification:
   sse:
@@ -39,4 +55,6 @@ notification:
 
 member:
   service:
-    url: http://localhost:8081
+    # Docker: MEMBER_SERVICE_URL=http://member-service:8080
+    # 로컬 직접 실행: localhost:8081
+    url: ${MEMBER_SERVICE_URL:http://localhost:8081}
