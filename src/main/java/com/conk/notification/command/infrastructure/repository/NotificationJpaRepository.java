@@ -1,8 +1,14 @@
 package com.conk.notification.command.infrastructure.repository;
 
 import com.conk.notification.command.domain.aggregate.Notification;
+import com.conk.notification.command.domain.enums.NotificationType;
 import com.conk.notification.command.domain.repository.NotificationRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * JPA 기반 알림 레포지토리 구현체
@@ -21,9 +27,26 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface NotificationJpaRepository
         extends JpaRepository<Notification, String>, NotificationRepository {
 
-    // JpaRepository가 이미 save(Notification), findById(String) 등을 제공하므로
-    // NotificationRepository의 save() 메서드는 자동으로 구현된다.
+    Page<Notification> findByAccountId(String accountId, Pageable pageable);
 
-    // 추후 필요한 커스텀 쿼리가 있으면 여기에 메서드를 추가한다.
-    // 예: List<Notification> findByAccountIdOrderByCreatedAtDesc(String accountId);
+    Page<Notification> findByAccountIdAndIsRead(String accountId, Boolean isRead, Pageable pageable);
+
+    Page<Notification> findByAccountIdAndNotificationType(
+            String accountId,
+            NotificationType notificationType,
+            Pageable pageable
+    );
+
+    Page<Notification> findByAccountIdAndNotificationTypeAndIsRead(
+            String accountId,
+            NotificationType notificationType,
+            Boolean isRead,
+            Pageable pageable
+    );
+
+    Optional<Notification> findByNotificationIdAndAccountId(String notificationId, String accountId);
+
+    List<Notification> findByAccountIdAndIsReadFalse(String accountId);
+
+    long countByAccountIdAndIsReadFalse(String accountId);
 }

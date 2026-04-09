@@ -1,5 +1,7 @@
 package com.conk.notification.command.application.dto;
 
+import java.time.LocalDateTime;
+
 /**
  * SSE로 브라우저에 전송하는 알림 데이터 DTO
  *
@@ -24,6 +26,12 @@ public class SseNotificationPayload {
     /** 알림 본문 메시지 */
     private final String message;
 
+    /** 읽음 여부 */
+    private final boolean isRead;
+
+    /** 생성 시각 */
+    private final LocalDateTime createdAt;
+
     /**
      * 읽지 않은 알림 총 개수
      * Redis에서 조회한 값으로 브라우저 뱃지 숫자를 업데이트할 때 사용한다.
@@ -37,10 +45,24 @@ public class SseNotificationPayload {
             String message,
             long unreadCount
     ) {
+        this(notificationId, type, title, message, false, null, unreadCount);
+    }
+
+    public SseNotificationPayload(
+            String notificationId,
+            String type,
+            String title,
+            String message,
+            boolean isRead,
+            LocalDateTime createdAt,
+            long unreadCount
+    ) {
         this.notificationId = notificationId;
         this.type = type;
         this.title = title;
         this.message = message;
+        this.isRead = isRead;
+        this.createdAt = createdAt;
         this.unreadCount = unreadCount;
     }
 
@@ -48,5 +70,7 @@ public class SseNotificationPayload {
     public String getType() { return type; }
     public String getTitle() { return title; }
     public String getMessage() { return message; }
+    public boolean getIsRead() { return isRead; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
     public long getUnreadCount() { return unreadCount; }
 }

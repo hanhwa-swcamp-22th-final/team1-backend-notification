@@ -2,10 +2,12 @@ package com.conk.notification.command.infrastructure.redis.listener;
 
 import com.conk.notification.command.application.dto.SseNotificationPayload;
 import com.conk.notification.command.application.event.NotificationCreatedEvent;
+import com.conk.notification.command.infrastructure.repository.NotificationJpaRepository;
 import com.conk.notification.command.infrastructure.redis.publisher.NotificationRedisPublisher;
 import com.conk.notification.command.infrastructure.redis.service.NotificationUnreadCountService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -21,6 +23,7 @@ public class NotificationRealtimeDispatchListener {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationRealtimeDispatchListener.class);
 
+    private final NotificationJpaRepository notificationJpaRepository;
     private final NotificationUnreadCountService unreadCountService;
     private final NotificationRedisPublisher redisPublisher;
 
@@ -28,6 +31,16 @@ public class NotificationRealtimeDispatchListener {
             NotificationUnreadCountService unreadCountService,
             NotificationRedisPublisher redisPublisher
     ) {
+        this(null, unreadCountService, redisPublisher);
+    }
+
+    @Autowired
+    public NotificationRealtimeDispatchListener(
+            NotificationJpaRepository notificationJpaRepository,
+            NotificationUnreadCountService unreadCountService,
+            NotificationRedisPublisher redisPublisher
+    ) {
+        this.notificationJpaRepository = notificationJpaRepository;
         this.unreadCountService = unreadCountService;
         this.redisPublisher = redisPublisher;
     }
@@ -42,7 +55,13 @@ public class NotificationRealtimeDispatchListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handle(NotificationCreatedEvent event) {
         try {
-            long unreadCount = unreadCountService.increment(event.getAccountId());
+            long unreadCount;
+            if (notificationJpaRepository != null) {
+                unreadCount = notificationJpaRepository.countByAccountIdAndIsReadFalse(event.getAccountId());
+                unreadCountService.setCount(event.getAccountId(), unreadCount);
+            } else {
+                unreadCount = unreadCountService.increment(event.getAccountId());
+            }
 
             redisPublisher.publish(
                     event.getAccountId(),
@@ -51,6 +70,8 @@ public class NotificationRealtimeDispatchListener {
                             event.getType(),
                             event.getTitle(),
                             event.getMessage(),
+                            false,
+                            event.getCreatedAt(),
                             unreadCount
                     )
             );

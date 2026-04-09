@@ -142,6 +142,19 @@ public class Notification {
         this.updatedAt = LocalDateTime.now();
     }
 
+    /**
+     * 읽지 않은 알림을 읽음 상태로 전환한다.
+     *
+     * @return 실제로 상태가 변경되었으면 true, 이미 읽음 상태였다면 false
+     */
+    public boolean markAsRead() {
+        if (Boolean.TRUE.equals(this.isRead)) {
+            return false;
+        }
+        this.isRead = true;
+        return true;
+    }
+
     // ==================== Getters ====================
     public String getNotificationId() { return notificationId; }
     public String getAccountId() { return accountId; }

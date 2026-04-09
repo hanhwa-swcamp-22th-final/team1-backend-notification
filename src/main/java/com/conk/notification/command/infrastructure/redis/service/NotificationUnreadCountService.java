@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.function.LongSupplier;
+
 /**
  * 읽지 않은 알림 카운트 관리 서비스
  *
@@ -85,6 +87,54 @@ public class NotificationUnreadCountService {
         } catch (Exception e) {
             log.error("[Redis 카운트 조회 실패] accountId={}, 오류={}", accountId, e.getMessage());
             return 0L;
+        }
+    }
+
+    /**
+     * 현재 캐시된 카운트를 조회한다.
+     *
+     * @return Redis 키가 없으면 null
+     */
+    public Long getCachedCount(String accountId) {
+        String key = KEY_PREFIX + accountId;
+
+        try {
+            String value = stringRedisTemplate.opsForValue().get(key);
+            return value != null ? Long.parseLong(value) : null;
+        } catch (Exception e) {
+            log.error("[Redis 캐시 카운트 조회 실패] accountId={}, 오류={}", accountId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 캐시에 값이 없으면 DB 기준 값을 초기화한 뒤 반환한다.
+     */
+    public long getOrInitialize(String accountId, LongSupplier dbCountSupplier) {
+        Long cached = getCachedCount(accountId);
+        if (cached != null) {
+            return cached;
+        }
+
+        long count = dbCountSupplier.getAsLong();
+        setCount(accountId, count);
+        return count;
+    }
+
+    /**
+     * 읽지 않은 알림 카운트를 DB 기준 값으로 덮어쓴다.
+     */
+    public void setCount(String accountId, long count) {
+        String key = KEY_PREFIX + accountId;
+
+        try {
+            if (count <= 0L) {
+                stringRedisTemplate.delete(key);
+                return;
+            }
+            stringRedisTemplate.opsForValue().set(key, String.valueOf(count));
+        } catch (Exception e) {
+            log.error("[Redis 카운트 설정 실패] accountId={}, 오류={}", accountId, e.getMessage());
         }
     }
 

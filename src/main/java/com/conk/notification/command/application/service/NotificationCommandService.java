@@ -68,7 +68,8 @@ public class NotificationCommandService {
                 notification.getAccountId(),
                 notification.getNotificationType().name(),
                 notification.getTitle(),
-                notification.getMessage()
+                notification.getMessage(),
+                notification.getCreatedAt()
         ));
 
         log.info("[알림 생성 완료] notificationId={}", notification.getNotificationId());

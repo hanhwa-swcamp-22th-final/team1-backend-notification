@@ -1,6 +1,7 @@
 package com.conk.notification.query.controller;
 
 import com.conk.notification.command.infrastructure.redis.service.NotificationUnreadCountService;
+import com.conk.notification.query.application.service.NotificationQueryService;
 import com.conk.notification.common.exception.BusinessException;
 import com.conk.notification.common.exception.ErrorCode;
 import com.conk.notification.common.sse.SseEmitterManager;
@@ -38,6 +39,7 @@ public class NotificationSseController {
 
     private final SseEmitterManager sseEmitterManager;
     private final NotificationUnreadCountService unreadCountService;
+    private final NotificationQueryService notificationQueryService;
 
     /**
      * SSE 연결 유지 시간 (밀리초)
@@ -49,18 +51,20 @@ public class NotificationSseController {
 
     public NotificationSseController(
             SseEmitterManager sseEmitterManager,
-            NotificationUnreadCountService unreadCountService
+            NotificationUnreadCountService unreadCountService,
+            NotificationQueryService notificationQueryService
     ) {
         this.sseEmitterManager = sseEmitterManager;
         this.unreadCountService = unreadCountService;
+        this.notificationQueryService = notificationQueryService;
     }
 
     /**
      * SSE 구독 엔드포인트
      *
      * 프론트엔드 연결 방법 (Vue.js 예시):
-     *   const eventSource = new EventSource('/notifications/sse/subscribe', {
-     *       headers: { 'X-User-Id': accountId }
+     *   const eventSource = new EventSourcePolyfill('/notifications/sse/subscribe', {
+     *       headers: { Authorization: 'Bearer ...' }
      *   });
      *   eventSource.addEventListener('notification', (e) => {
      *       const data = JSON.parse(e.data);
@@ -138,33 +142,10 @@ public class NotificationSseController {
             );
         }
 
-        long count = unreadCountService.getCount(resolvedAccountId);
+        long count = unreadCountService.getOrInitialize(
+                resolvedAccountId,
+                () -> notificationQueryService.countUnreadNotifications(resolvedAccountId)
+        );
         return ResponseEntity.ok(count);
-    }
-
-    /**
-     * 읽지 않은 알림 카운트 초기화 엔드포인트
-     *
-     * 사용자가 알림 목록을 열었을 때 호출하여 뱃지 숫자를 0으로 리셋한다.
-     *
-     * DELETE /notifications/unread-count
-     * 헤더: X-User-Id (nginx 주입)
-     */
-    @DeleteMapping("/unread-count")
-    public ResponseEntity<Void> resetUnreadCount(
-            @RequestHeader(value = "X-User-Id", required = false) String accountId,
-            @RequestParam(value = "accountId", required = false) String accountIdParam
-    ) {
-        String resolvedAccountId = (accountId != null) ? accountId : accountIdParam;
-
-        if (resolvedAccountId == null || resolvedAccountId.isBlank()) {
-            throw new BusinessException(
-                    ErrorCode.MISSING_ACCOUNT_ID,
-                    "accountId가 필요합니다. (헤더 X-User-Id 또는 쿼리 파라미터 accountId)"
-            );
-        }
-
-        unreadCountService.reset(resolvedAccountId);
-        return ResponseEntity.noContent().build();
     }
 }

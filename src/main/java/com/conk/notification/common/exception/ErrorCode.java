@@ -13,6 +13,8 @@ public enum ErrorCode {
 
     // 400 Bad Request — 요청 유효성
     MISSING_ACCOUNT_ID(HttpStatus.BAD_REQUEST, "NTF-001", "accountId가 필요합니다."),
+    INVALID_NOTIFICATION_TYPE(HttpStatus.BAD_REQUEST, "NTF-002", "알림 타입이 올바르지 않습니다."),
+    NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NTF-003", "알림을 찾을 수 없습니다."),
 
     // 400 / 500 — Kafka / 내부 처리 오류
     INVALID_KAFKA_MESSAGE(HttpStatus.BAD_REQUEST, "NTF-301", "Kafka 메시지 형식이 올바르지 않습니다."),
