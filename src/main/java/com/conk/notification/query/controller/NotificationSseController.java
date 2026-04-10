@@ -1,7 +1,7 @@
 package com.conk.notification.query.controller;
 
 import com.conk.notification.command.infrastructure.redis.service.NotificationUnreadCountService;
-import com.conk.notification.query.application.service.NotificationQueryService;
+import com.conk.notification.query.service.NotificationQueryService;
 import com.conk.notification.common.exception.BusinessException;
 import com.conk.notification.common.exception.ErrorCode;
 import com.conk.notification.common.sse.SseEmitterManager;

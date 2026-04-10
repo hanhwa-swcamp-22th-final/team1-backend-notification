@@ -3,7 +3,7 @@ package com.conk.notification.query.controller;
 import com.conk.notification.command.application.service.NotificationReadService;
 import com.conk.notification.common.exception.BusinessException;
 import com.conk.notification.common.exception.ErrorCode;
-import com.conk.notification.query.application.service.NotificationQueryService;
+import com.conk.notification.query.service.NotificationQueryService;
 import com.conk.notification.query.dto.NotificationListItemResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
