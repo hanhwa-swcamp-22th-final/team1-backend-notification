@@ -1,4 +1,4 @@
-package com.conk.notification.query.application.service;
+package com.conk.notification.query.service;
 
 import com.conk.notification.command.domain.aggregate.Notification;
 import com.conk.notification.command.domain.enums.NotificationType;
