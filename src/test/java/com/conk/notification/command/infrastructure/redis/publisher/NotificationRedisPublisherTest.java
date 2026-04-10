@@ -43,7 +43,7 @@ class NotificationRedisPublisherTest {
     }
 
     @Test
-    @DisplayName("정상 publish - 올바른 채널에 직렬화된 JSON을 전송한다")
+    @DisplayName("직렬화된 JSON을 올바른 채널로 전송한다")
     void publish_sendsSerializedPayloadToCorrectChannel() throws JsonProcessingException {
         SseNotificationPayload payload = samplePayload();
         given(objectMapper.writeValueAsString(payload)).willReturn("{\"notificationId\":\"notification-1\"}");

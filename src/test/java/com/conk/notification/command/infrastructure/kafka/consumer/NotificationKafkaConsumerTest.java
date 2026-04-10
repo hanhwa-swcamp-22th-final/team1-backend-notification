@@ -42,7 +42,7 @@ class NotificationKafkaConsumerTest {
     }
 
     @Test
-    @DisplayName("TASK_ASSIGNED 이벤트는 workerId를 accountId로 알림을 생성한다")
+    @DisplayName("TASK_ASSIGNED 이벤트의 workerId를 accountId로 사용해 알림을 생성한다")
     void consumeTaskAssigned_callsNotificationCommandService() {
         consumer.consumeTaskAssigned("""
                 {"workerId":"1001","roleId":"ROLE_WH_WORKER","assignedCount":3,"tenantId":"tenant-001"}
@@ -60,7 +60,7 @@ class NotificationKafkaConsumerTest {
     }
 
     @Test
-    @DisplayName("ASN_CREATED 이벤트는 managerId를 accountId로 알림을 생성한다")
+    @DisplayName("ASN_CREATED 이벤트의 managerId를 accountId로 사용해 알림을 생성한다")
     void consumeAsnCreated_createsNotificationForManager() {
         consumer.consumeAsnCreated("""
                 {"asnId":"ASN-1","managerId":"2001","asnCount":2,"expectedDate":"2026-04-10"}
