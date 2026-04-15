@@ -24,7 +24,7 @@ spring:
     # 로컬 직접 실행: localhost:9094 (Kafka 외부 리스너)
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
     consumer:
-      group-id: notification-group
+      group-id: ${NOTIFICATION_KAFKA_CONSUMER_GROUP_ID:notification-group}
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -51,7 +51,7 @@ management:
 
 notification:
   sse:
-    timeout: 1800000
+    timeout: ${NOTIFICATION_SSE_TIMEOUT:1800000}
 
 member:
   service:
