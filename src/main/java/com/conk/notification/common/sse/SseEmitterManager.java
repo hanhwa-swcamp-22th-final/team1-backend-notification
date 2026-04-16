@@ -2,9 +2,14 @@ package com.conk.notification.common.sse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -31,6 +36,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SseEmitterManager {
 
     private static final Logger log = LoggerFactory.getLogger(SseEmitterManager.class);
+
+    /**
+     * heartbeat 전송 주기 (밀리초)
+     * application.yml의 notification.sse.heartbeat-interval 값을 주입받는다.
+     * event-source-polyfill의 기본 타임아웃(45초)보다 짧아야 한다.
+     */
+    @Value("${notification.sse.heartbeat-interval}")
+    private long heartbeatInterval;
 
     /**
      * accountId → SseEmitter 매핑
@@ -104,5 +117,49 @@ public class SseEmitterManager {
      */
     public int getConnectedCount() {
         return emitters.size();
+    }
+
+    /**
+     * 주기적으로 모든 SSE 연결에 heartbeat를 전송한다.
+     *
+     * 왜 필요한가?
+     *   event-source-polyfill은 45초(기본값) 동안 데이터가 없으면 연결이 끊겼다고 판단하고
+     *   재연결을 시도한다. 실제 알림이 뜸한 경우 연결이 계속 끊기고 재연결되는 루프가 발생한다.
+     *   서버에서 주기적으로 SSE 코멘트를 전송하면 이 타임아웃을 리셋할 수 있다.
+     *
+     * SSE 코멘트란?
+     *   ': ping' 형식의 콜론으로 시작하는 줄은 SSE 명세상 코멘트이다.
+     *   브라우저의 EventSource 이벤트 핸들러(addEventListener)에는 전달되지 않지만
+     *   TCP 레벨에서 실제 데이터를 전송하므로 polyfill의 타임아웃을 리셋한다.
+     *
+     * fixedDelayString을 사용하는 이유:
+     *   heartbeatInterval이 @Value로 주입되는 인스턴스 필드이기 때문에
+     *   컴파일 타임 상수가 필요한 @Scheduled(fixedDelay = ...) 대신
+     *   SpEL 표현식을 지원하는 fixedDelayString을 사용한다.
+     */
+    @Scheduled(fixedDelayString = "${notification.sse.heartbeat-interval}")
+    public void sendHeartbeat() {
+        if (emitters.isEmpty()) {
+            return;
+        }
+
+        // 전송 실패한 accountId를 수집하여 Map에서 일괄 제거
+        List<String> deadIds = new ArrayList<>();
+
+        emitters.forEach((accountId, emitter) -> {
+            try {
+                // SSE 코멘트 형식: ": ping"
+                // SseEmitter.event()가 아닌 raw comment 전송
+                emitter.send(SseEmitter.event().comment("ping"));
+            } catch (IOException e) {
+                // 이미 끊긴 연결 — 제거 대상으로 표시
+                deadIds.add(accountId);
+            }
+        });
+
+        if (!deadIds.isEmpty()) {
+            deadIds.forEach(emitters::remove);
+            log.info("[SSE heartbeat] 죽은 연결 제거: {}개, 남은 연결: {}개", deadIds.size(), emitters.size());
+        }
     }
 }

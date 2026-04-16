@@ -52,6 +52,8 @@ management:
 notification:
   sse:
     timeout: ${NOTIFICATION_SSE_TIMEOUT:1800000}
+    # heartbeat 전송 주기 (ms). event-source-polyfill 타임아웃(45초)보다 짧게 유지해야 한다.
+    heartbeat-interval: ${NOTIFICATION_SSE_HEARTBEAT_INTERVAL:30000}
 
 member:
   service:
