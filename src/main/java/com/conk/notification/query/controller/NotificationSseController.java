@@ -8,6 +8,7 @@ import com.conk.notification.common.sse.SseEmitterManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -80,7 +81,7 @@ public class NotificationSseController {
      * @return SseEmitter - 연결 유지 객체 (Spring이 응답을 자동으로 스트리밍 모드로 처리)
      */
     @GetMapping(value = "/sse/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(
+    public ResponseEntity<SseEmitter> subscribe(
             @RequestHeader(value = "X-User-Id", required = false) String accountId,
             @RequestParam(value = "accountId", required = false) String accountIdParam
     ) {
@@ -116,7 +117,12 @@ public class NotificationSseController {
             sseEmitterManager.remove(resolvedAccountId);
         }
 
-        return emitter;
+        // X-Accel-Buffering: no — Nginx가 이 헤더를 인식하면 해당 응답의 버퍼링을 즉시 비활성화한다.
+        // proxy-buffering: off annotation만으로는 Nginx 내부 메모리 코얼레싱을 막지 못하기 때문에
+        // heartbeat 청크가 flush되지 않아 event-source-polyfill의 45초 타임아웃이 발생하는 문제를 해결한다.
+        return ResponseEntity.ok()
+                .header("X-Accel-Buffering", "no")
+                .body(emitter);
     }
 
     /**
