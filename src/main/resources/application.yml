@@ -2,6 +2,9 @@ spring:
   application:
     name: team1-backend-notification
 
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
   datasource:
     # Docker: SPRING_DATASOURCE_URL 환경변수로 주입 (notification-db:3306)
     # 로컬 직접 실행: 기본값 localhost:3307 사용
@@ -39,6 +42,7 @@ spring:
       timeout: 3000ms
 
 server:
+  shutdown: graceful
   port: 8080
 
 management:
