@@ -11,6 +11,7 @@ spring:
     driver-class-name: org.mariadb.jdbc.Driver
 
   jpa:
+    open-in-view: false
     hibernate:
       # create → update: 재시작해도 기존 데이터 유지
       ddl-auto: update
